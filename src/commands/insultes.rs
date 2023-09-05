@@ -15,15 +15,15 @@ pub fn run(options: &[CommandDataOption]) -> String {
         .as_ref()
         .expect("Expected victim object");
 
-    let insulte_option = options
-        .get(1)
-        .expect("Expected message")
-        .resolved
-        .as_ref()
-        .expect("Expected message");
+   // let insulte_option = options
+   //     .get(1)
+   //     .expect("Expected message")
+  //      .resolved
+  //      .as_ref()
+  //      .expect("Expected message");
 
     let mut user_id = 0;
-    let mut insulte = String::new();
+   // let mut insulte = String::new();
 
     // Vérifier le type de l'option User
     if let CommandDataOptionValue::User(user, _member) = victime_option {
@@ -31,10 +31,12 @@ pub fn run(options: &[CommandDataOption]) -> String {
     }
 
     // Vérifier le type de l'option String
-    if let CommandDataOptionValue::String(msg) = insulte_option {
-        insulte = msg.clone();
-    }
-
+    //if let CommandDataOptionValue::String(msg) = insulte_option {
+    //    insulte = msg.clone();
+    //}
+    let xxx = ["fdp", "ba nik ta mere","jtaime pas","pute pute","patéthique merde","la collote de t more","t'es fada salop","bougre de zouave","vilin","jeunes effrontés","dinguerie si j't'encule pas","que dieux pardonene ta stupidité fdp","toi est moi , hoctoone mtn","je v te défoncé et arrosé mes carrote avec ton sang"];
+    let insulte = xxx[rand::thread_rng().gen_range(0..xxx.len())];
+    
     let mention = format!("<@{}>", user_id);
 
     if user_id != 0 && insulte.is_empty() {
@@ -55,11 +57,11 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
                 .kind(CommandOptionType::User)
                 .required(true)
         })
-        .create_option(|option| {
-            option
-                .name("trash")
-                .description("l'insulte en question")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
+    //    .create_option(|option| {
+    //        option
+    //            .name("trash")
+   //             .description("l'insulte en question")
+   //             .kind(CommandOptionType::String)
+   //             .required(true)
+    //    })
 }

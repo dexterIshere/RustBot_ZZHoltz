@@ -2,7 +2,7 @@ mod commands;
 
 use anyhow::anyhow;
 use serenity::async_trait;
-use serenity::model::application::command::Command;
+// use serenity::model::application::command::Command;
 use serenity::model::application::interaction::{Interaction, InteractionResponseType};
 use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
@@ -20,10 +20,6 @@ impl EventHandler for Handler {
             println!("Received command interaction: {:#?}", command);
 
             let content = match command.data.name.as_str() {
-                "ping" => commands::ping::run(&command.data.options),
-                "id" => commands::id::run(&command.data.options),
-                "attachmentinput" => commands::attachmentinput::run(&command.data.options),
-                "welcome" => commands::welcome::run(&command.data.options),
                 "insulte" => commands::insultes::run(&command.data.options),
                 _ => "not implemented :(".to_string(),
             };
@@ -47,12 +43,7 @@ impl EventHandler for Handler {
         let guild_id = GuildId(self.guild_id.parse().unwrap());
 
         let commands = GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
-            commands
-                .create_application_command(|command| commands::ping::register(command))
-                .create_application_command(|command| commands::id::register(command))
-                .create_application_command(|command| commands::welcome::register(command))
-                .create_application_command(|command| commands::numberinput::register(command))
-                .create_application_command(|command| commands::attachmentinput::register(command))
+            commands.create_application_command(|command| commands::insultes::register(command))
         })
         .await;
 
@@ -60,15 +51,15 @@ impl EventHandler for Handler {
             "I now have the following guild slash commands: {:#?}",
             commands
         );
-        let guild_command = Command::create_global_application_command(&ctx.http, |command| {
-            commands::insultes::register(command)
-        })
-        .await;
+        // let guild_command = Command::create_global_application_command(&ctx.http, |command| {
+        //     commands::insultes::register(command)
+        // })
+        // .await;
 
-        println!(
-            "I created the following global slash command: {:#?}",
-            guild_command
-        );
+        // println!(
+        //     "I created the following global slash command: {:#?}",
+        //     guild_command
+        // );
     }
 }
 

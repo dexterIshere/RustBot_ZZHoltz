@@ -6,7 +6,9 @@ use serenity::async_trait;
 use serenity::model::application::interaction::{Interaction, InteractionResponseType};
 use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
+use serenity::model::prelude::Message;
 use serenity::prelude::*;
+use serenity::utils::MessageBuilder;
 use shuttle_secrets::SecretStore;
 
 struct Handler {
@@ -21,6 +23,7 @@ impl EventHandler for Handler {
 
             let content = match command.data.name.as_str() {
                 "insulte" => commands::insultes::run(&command.data.options),
+                "balle_perdu" => commands::fast_trash::run(&command.data.options),
                 _ => "not implemented :(".to_string(),
             };
 
@@ -37,13 +40,44 @@ impl EventHandler for Handler {
         }
     }
 
+    async fn message(&self, context: Context, msg: Message) {
+        if msg.content == "!ping" {
+            let channel = match msg.channel_id.to_channel(&context).await {
+                Ok(channel) => channel,
+                Err(why) => {
+                    println!("Error getting channel: {:?}", why);
+
+                    return;
+                }
+            };
+
+            // The message builder allows for creating a message by
+            // mentioning users dynamically, pushing "safe" versions of
+            // content (such as bolding normalized content), displaying
+            // emojis, and more.
+            let response = MessageBuilder::new()
+                .push("User ")
+                .push_bold_safe(&msg.author.name)
+                .push(" used the 'ping' command in the ")
+                .mention(&channel)
+                .push(" channel")
+                .build();
+
+            if let Err(why) = msg.channel_id.say(&context.http, &response).await {
+                println!("Error sending message: {:?}", why);
+            }
+        }
+    }
+
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
 
         let guild_id = GuildId(self.guild_id.parse().unwrap());
 
         let commands = GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
-            commands.create_application_command(|command| commands::insultes::register(command))
+            commands
+                .create_application_command(|command| commands::insultes::register(command))
+                .create_application_command(|command| commands::fast_trash::register(command))
         })
         .await;
 
@@ -55,11 +89,17 @@ impl EventHandler for Handler {
         //     commands::insultes::register(command)
         // })
         // .await;
-
         // println!(
         //     "I created the following global slash command: {:#?}",
         //     guild_command
         // );
+
+        // if let Err(why) = guild_id
+        //     .delete_application_command(&ctx.http, 1148719344755413002)
+        //     .await
+        // {
+        //     println!("Erreur lors de la suppression de la commande : {:?}", why);
+        // }
     }
 }
 
@@ -73,6 +113,7 @@ async fn serenity(
     } else {
         return Err(anyhow!("'DISCORD_TOKEN' was not found").into());
     };
+
     let guild_id = if let Some(guild_id) = secret_store.get("GUILD_ID") {
         guild_id
     } else {
@@ -82,7 +123,9 @@ async fn serenity(
     let handler = Handler { guild_id };
 
     // Set gateway intents, which decides what events the bot will be notified about
-    let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
+    let intents = GatewayIntents::GUILD_MESSAGES
+        | GatewayIntents::DIRECT_MESSAGES
+        | GatewayIntents::MESSAGE_CONTENT;
 
     let client = Client::builder(&token, intents)
         .event_handler(handler)

@@ -6,9 +6,7 @@ use serenity::async_trait;
 use serenity::model::application::interaction::{Interaction, InteractionResponseType};
 use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
-use serenity::model::prelude::Message;
 use serenity::prelude::*;
-use serenity::utils::MessageBuilder;
 use shuttle_secrets::SecretStore;
 
 struct Handler {
@@ -40,35 +38,6 @@ impl EventHandler for Handler {
         }
     }
 
-    async fn message(&self, context: Context, msg: Message) {
-        if msg.content == "!ping" {
-            let channel = match msg.channel_id.to_channel(&context).await {
-                Ok(channel) => channel,
-                Err(why) => {
-                    println!("Error getting channel: {:?}", why);
-
-                    return;
-                }
-            };
-
-            // The message builder allows for creating a message by
-            // mentioning users dynamically, pushing "safe" versions of
-            // content (such as bolding normalized content), displaying
-            // emojis, and more.
-            let response = MessageBuilder::new()
-                .push("User ")
-                .push_bold_safe(&msg.author.name)
-                .push(" used the 'ping' command in the ")
-                .mention(&channel)
-                .push(" channel")
-                .build();
-
-            if let Err(why) = msg.channel_id.say(&context.http, &response).await {
-                println!("Error sending message: {:?}", why);
-            }
-        }
-    }
-
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
 
@@ -85,21 +54,27 @@ impl EventHandler for Handler {
             "I now have the following guild slash commands: {:#?}",
             commands
         );
-        // let guild_command = Command::create_global_application_command(&ctx.http, |command| {
-        //     commands::insultes::register(command)
-        // })
-        // .await;
-        // println!(
-        //     "I created the following global slash command: {:#?}",
-        //     guild_command
-        // );
 
-        // if let Err(why) = guild_id
-        //     .delete_application_command(&ctx.http, 1148719344755413002)
-        //     .await
-        // {
-        //     println!("Erreur lors de la suppression de la commande : {:?}", why);
-        // }
+        let command_ids_to_delete: Vec<u64> = vec![
+            1148719344755413002,
+            1148734686386978816,
+            1148601646490865795,
+        ];
+
+        for command_id in command_ids_to_delete.iter() {
+            if let Err(why) = ctx
+                .http
+                .delete_global_application_command(*command_id)
+                .await
+            {
+                println!(
+                    "Erreur lors de la suppression de la commande globale {} : {:?}",
+                    command_id, why
+                );
+            } else {
+                println!("Commande globale {} supprimée avec succès.", command_id);
+            }
+        }
     }
 }
 

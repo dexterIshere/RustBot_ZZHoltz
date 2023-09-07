@@ -55,26 +55,24 @@ impl EventHandler for Handler {
             commands
         );
 
-        let command_ids_to_delete: Vec<u64> = vec![
-            1148719344755413002,
-            1148734686386978816,
-            1148601646490865795,
-        ];
+        // let command_ids_to_delete: Vec<u64> = vec![
+        // uncoment and add some ids here to delete them
+        // ];
 
-        for command_id in command_ids_to_delete.iter() {
-            if let Err(why) = ctx
-                .http
-                .delete_global_application_command(*command_id)
-                .await
-            {
-                println!(
-                    "Erreur lors de la suppression de la commande globale {} : {:?}",
-                    command_id, why
-                );
-            } else {
-                println!("Commande globale {} supprimée avec succès.", command_id);
-            }
-        }
+        // for command_id in command_ids_to_delete.iter() {
+        //     if let Err(why) = ctx
+        //         .http
+        //         .delete_global_application_command(*command_id)
+        //         .await
+        //     {
+        //         println!(
+        //             "Erreur lors de la suppression de la commande globale {} : {:?}",
+        //             command_id, why
+        //         );
+        //     } else {
+        //         println!("Commande globale {} supprimée avec succès.", command_id);
+        //     }
+        // }
     }
 }
 

@@ -2,4 +2,4 @@
 Secrets*.toml
 .env
 database.sqlite*
-/src/static
+/static

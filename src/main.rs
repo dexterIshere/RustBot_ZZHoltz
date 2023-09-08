@@ -23,6 +23,14 @@ impl EventHandler for Handler {
 
             let content = match command.data.name.as_str() {
                 "insulte" => commands::insultes::run(&command.data.options),
+                "trash_list" => {
+                    commands::return_trash_list::run(&command.data.options, &self.static_folder)
+                }
+                "add_bullshit" => commands::add_bullshit::run(
+                    &command.data.options,
+                    &self.static_folder,
+                    &command,
+                ),
                 "balle_perdu" => {
                     commands::fast_trash::run(&command.data.options, &self.static_folder)
                 }
@@ -51,6 +59,10 @@ impl EventHandler for Handler {
             commands
                 .create_application_command(|command| commands::insultes::register(command))
                 .create_application_command(|command| commands::fast_trash::register(command))
+                .create_application_command(|command| commands::add_bullshit::register(command))
+                .create_application_command(|command| {
+                    commands::return_trash_list::register(command)
+                })
         })
         .await;
 

@@ -1,5 +1,7 @@
 mod commands;
 
+use std::path::PathBuf;
+
 use anyhow::anyhow;
 use serenity::async_trait;
 // use serenity::model::application::command::Command;
@@ -8,9 +10,9 @@ use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
 use serenity::prelude::*;
 use shuttle_secrets::SecretStore;
-
 struct Handler {
     guild_id: String,
+    static_folder: PathBuf,
 }
 
 #[async_trait]
@@ -21,7 +23,9 @@ impl EventHandler for Handler {
 
             let content = match command.data.name.as_str() {
                 "insulte" => commands::insultes::run(&command.data.options),
-                "balle_perdu" => commands::fast_trash::run(&command.data.options),
+                "balle_perdu" => {
+                    commands::fast_trash::run(&command.data.options, &self.static_folder)
+                }
                 _ => "not implemented :(".to_string(),
             };
 
@@ -55,31 +59,33 @@ impl EventHandler for Handler {
             commands
         );
 
-        // let command_ids_to_delete: Vec<u64> = vec![
-        // uncoment and add some ids here to delete them
-        // ];
-
-        // for command_id in command_ids_to_delete.iter() {
-        //     if let Err(why) = ctx
-        //         .http
-        //         .delete_global_application_command(*command_id)
-        //         .await
-        //     {
-        //         println!(
-        //             "Erreur lors de la suppression de la commande globale {} : {:?}",
-        //             command_id, why
-        //         );
-        //     } else {
-        //         println!("Commande globale {} supprimée avec succès.", command_id);
-        //     }
-        // }
+        //  let command_ids_to_delete: Vec<u64> = vec![
+        //  uncoment and add some ids here to delete them
+        //  ];
+        //  for command_id in command_ids_to_delete.iter() {
+        //      if let Err(why) = ctx
+        //          .http
+        //          .delete_global_application_command(*command_id)
+        //          .await
+        //      {
+        //          println!(
+        //              "Erreur lors de la suppression de la commande globale {} : {:?}",
+        //              command_id, why
+        //          );
+        //      } else {
+        //          println!("Commande globale {} supprimée avec succès.", command_id);
+        //      }
+        //  }//
     }
 }
 
 #[shuttle_runtime::main]
 async fn serenity(
     #[shuttle_secrets::Secrets] secret_store: SecretStore,
+    #[shuttle_static_folder::StaticFolder] static_folder: PathBuf,
 ) -> shuttle_serenity::ShuttleSerenity {
+    commands::fast_trash::load_insultes(&static_folder);
+
     // Get the discord token set in `Secrets.toml`
     let token = if let Some(token) = secret_store.get("DISCORD_TOKEN") {
         token
@@ -93,7 +99,10 @@ async fn serenity(
         return Err(anyhow!("'GUILD_ID' was not found").into());
     };
 
-    let handler = Handler { guild_id };
+    let handler = Handler {
+        guild_id,
+        static_folder,
+    };
 
     // Set gateway intents, which decides what events the bot will be notified about
     let intents = GatewayIntents::GUILD_MESSAGES

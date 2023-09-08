@@ -4,11 +4,13 @@ use serenity::model::prelude::interaction::application_command::{
     CommandDataOption, CommandDataOptionValue,
 };
 use std::fs;
+use std::path::PathBuf;
 
 use rand::Rng;
 
-fn load_insultes() -> Vec<String> {
-    let data = fs::read_to_string("src/hum.json").expect("Bruh wrong path");
+pub fn load_insultes(static_folder: &PathBuf) -> Vec<String> {
+    let full_path = static_folder.join("hum.json");
+    let data = fs::read_to_string(full_path).expect("Bruh wrong path");
     let json: serde_json::Value = serde_json::from_str(&data).expect("pas formater");
     json["insultes"]
         .as_array()
@@ -17,9 +19,8 @@ fn load_insultes() -> Vec<String> {
         .map(|x| x.as_str().unwrap().to_string())
         .collect()
 }
-
-pub fn run(options: &[CommandDataOption]) -> String {
-    let insultes = load_insultes();
+pub fn run(options: &[CommandDataOption], static_folder: &PathBuf) -> String {
+    let insultes = load_insultes(static_folder);
     let mut rng = rand::thread_rng();
     let insulte = insultes[rng.gen_range(0..insultes.len())].clone();
 

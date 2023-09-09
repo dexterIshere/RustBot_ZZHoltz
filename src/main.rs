@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::anyhow;
 use serenity::async_trait;
+use serenity::model::Permissions;
 // use serenity::model::application::command::Command;
 use serenity::model::application::interaction::{Interaction, InteractionResponseType};
 use serenity::model::gateway::Ready;
@@ -22,11 +23,7 @@ struct Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, context: Context, msg: Message) {
-        if msg.content == "!test" {
-            println!("Message reçu: {}", msg.content);
-        }
         list(context.clone(), msg.clone(), &self.static_folder).await;
-
         format_list(context, msg, &self.static_folder).await;
     }
 

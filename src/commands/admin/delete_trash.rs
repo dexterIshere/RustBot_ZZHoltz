@@ -8,6 +8,7 @@ use serenity::model::prelude::command::CommandOptionType;
 use serenity::model::prelude::interaction::application_command::{
     CommandDataOption, CommandDataOptionValue,
 };
+use serenity::model::Permissions;
 use serenity::utils::MessageBuilder;
 
 pub fn run(
@@ -65,9 +66,11 @@ pub fn run(
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+    let permissions = Permissions::ADMINISTRATOR;
     command
         .name("delete_bullshit")
         .description("suprime une balle perdu de la liste")
+        .default_member_permissions(permissions)
         .create_option(|option| {
             option
                 .name("numéro")

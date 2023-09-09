@@ -1,23 +1,23 @@
 mod commands;
+mod models;
 
 use std::path::PathBuf;
 
 use anyhow::anyhow;
+use commands::admin::format_list::format_list;
+use commands::admin::return_trash_list::list;
 use serenity::async_trait;
-use serenity::model::Permissions;
-// use serenity::model::application::command::Command;
 use serenity::model::application::interaction::{Interaction, InteractionResponseType};
 use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
 use serenity::model::prelude::Message;
 use serenity::prelude::*;
 use shuttle_secrets::SecretStore;
-
-use commands::admin::format_list::format_list;
-use commands::admin::return_trash_list::list;
+use sqlx::{Executor, PgPool};
 struct Handler {
     guild_id: String,
     static_folder: PathBuf,
+    database: PgPool,
 }
 
 #[async_trait]
@@ -33,15 +33,13 @@ impl EventHandler for Handler {
 
             let content = match command.data.name.as_str() {
                 "insulte" => commands::insultes::run(&command.data.options),
-                "add_bullshit" => commands::add_bullshit::run(
-                    &command.data.options,
-                    &self.static_folder,
-                    &command,
-                ),
+                "add_bullshit" => {
+                    commands::add_bullshit::run(&command.data.options, &command, &self.database)
+                }
                 "delete_bullshit" => commands::admin::delete_trash::run(
                     &command.data.options,
-                    &self.static_folder,
                     &command,
+                    &self.database,
                 ),
                 "balle_perdu" => {
                     commands::fast_trash::run(&command.data.options, &self.static_folder)
@@ -106,6 +104,7 @@ impl EventHandler for Handler {
 
 #[shuttle_runtime::main]
 async fn serenity(
+    #[shuttle_shared_db::Postgres] pool: PgPool,
     #[shuttle_secrets::Secrets] secret_store: SecretStore,
     #[shuttle_static_folder::StaticFolder] static_folder: PathBuf,
 ) -> shuttle_serenity::ShuttleSerenity {
@@ -124,7 +123,14 @@ async fn serenity(
         return Err(anyhow!("'GUILD_ID' was not found").into());
     };
 
+    // Run the schema migration
+    anyhow::Context::context(
+        pool.execute(include_str!("../schema.sql")).await,
+        "failed to run migrations",
+    )?;
+
     let handler = Handler {
+        database: pool,
         guild_id,
         static_folder,
     };

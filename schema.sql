@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS insultes (
+    id SERIAL PRIMARY KEY,  
+    insulte TEXT NOT NULL 
+);

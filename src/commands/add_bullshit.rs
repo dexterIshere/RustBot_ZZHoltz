@@ -1,19 +1,18 @@
-use std::fs;
-use std::path::PathBuf;
+use crate::models::sentences::add_trash;
 
 use serenity::builder::CreateApplicationCommand;
-use serenity::json::Value;
 use serenity::model::prelude::application_command::ApplicationCommandInteraction;
 use serenity::model::prelude::command::CommandOptionType;
 use serenity::model::prelude::interaction::application_command::{
     CommandDataOption, CommandDataOptionValue,
 };
 use serenity::utils::MessageBuilder;
+use sqlx::PgPool;
 
 pub fn run(
     options: &[CommandDataOption],
-    static_folder: &PathBuf,
     command: &ApplicationCommandInteraction,
+    pool: &PgPool,
 ) -> String {
     let new_insulte_option = options
         .get(0)
@@ -28,28 +27,7 @@ pub fn run(
         new_trash = msg.clone();
     }
 
-    let full_path = static_folder.join("hum.json");
-
-    let data = fs::read_to_string(&full_path).expect("Bruh wrong path");
-
-    let mut parsed_data: Value =
-        serde_json::from_str(&data).expect("Erreur lors du parsing du JSON");
-
-    if let Some(insultes_map) = parsed_data["insultes"].as_object_mut() {
-        let last_key = insultes_map
-            .keys()
-            .last()
-            .unwrap_or(&"0".to_string())
-            .clone();
-        let new_key: u64 = last_key.parse::<u64>().unwrap_or(0) + 1;
-        insultes_map.insert(new_key.to_string(), Value::String(new_trash.clone()));
-    }
-
-    fs::write(
-        &full_path,
-        serde_json::to_string(&parsed_data).expect("Erreur lors de la sérialisation du JSON"),
-    )
-    .expect("Impossible d'écrire dans le fichier");
+    add_trash(pool, &new_trash);
 
     let response = MessageBuilder::new()
         .push_bold_safe(&command.user.name)

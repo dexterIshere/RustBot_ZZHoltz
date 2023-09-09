@@ -13,15 +13,12 @@ pub async fn format_list(context: Context, msg: Message, static_folder: &PathBuf
     let data = fs::read_to_string(&full_path).expect("Bruh wrong path");
     let json: Value = serde_json::from_str(&data).expect("Erreur lors du parsing du JSON");
 
-    // Obtenir le HashMap d'insultes
     let insultes_map = json["insultes"]
         .as_object()
         .expect("Le champ 'insultes' doit être un objet");
 
-    // Créer un nouveau BTreeMap pour stocker les insultes triées
     let mut new_insultes = BTreeMap::new();
 
-    // Parcourir le HashMap existant et ajouter chaque élément au BTreeMap
     for (key, value) in insultes_map {
         let value_str = value
             .as_str()
@@ -30,12 +27,10 @@ pub async fn format_list(context: Context, msg: Message, static_folder: &PathBuf
         new_insultes.insert(key.clone(), value_str);
     }
 
-    // Créer un nouveau JSON avec le BTreeMap
     let new_json = json!({
         "insultes": new_insultes
     });
 
-    // Écrire le nouveau JSON dans le fichier
     fs::write(
         full_path,
         serde_json::to_string_pretty(&new_json).expect("Erreur lors de la sérialisation du JSON"),

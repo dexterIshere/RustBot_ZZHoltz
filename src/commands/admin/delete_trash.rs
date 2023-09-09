@@ -15,18 +15,17 @@ pub fn run(
     static_folder: &PathBuf,
     command: &ApplicationCommandInteraction,
 ) -> String {
-    let new_insulte_option = options
+    let delete_option = options
         .get(0)
-        .expect("écris une insulte")
+        .expect("chiffre invalide")
         .resolved
         .as_ref()
-        .expect("écris une insulte");
+        .expect("chiffre invalide");
 
-    let mut new_trash = String::new();
-
-    if let CommandDataOptionValue::String(msg) = new_insulte_option {
-        new_trash = msg.clone();
-    }
+    let delete_key = match delete_option {
+        CommandDataOptionValue::Integer(int) => int.to_string(),
+        _ => return "Type de donnée invalide".to_string(),
+    };
 
     let full_path = static_folder.join("hum.json");
 
@@ -35,15 +34,19 @@ pub fn run(
     let mut parsed_data: Value =
         serde_json::from_str(&data).expect("Erreur lors du parsing du JSON");
 
+    let mut deleted = "Non supprimé".to_string();
+
     if let Some(insultes_map) = parsed_data["insultes"].as_object_mut() {
-        let last_key = insultes_map
-            .keys()
-            .last()
-            .unwrap_or(&"0".to_string())
-            .clone();
-        let new_key: u64 = last_key.parse::<u64>().unwrap_or(0) + 1;
-        insultes_map.insert(new_key.to_string(), Value::String(new_trash.clone()));
+        if insultes_map.remove(&delete_key).is_some() {
+            deleted = delete_key;
+        }
     }
+
+    fs::write(
+        &full_path,
+        serde_json::to_string(&parsed_data).expect("Erreur lors de la sérialisation du JSON"),
+    )
+    .expect("Impossible d'écrire dans le fichier");
 
     fs::write(
         &full_path,
@@ -53,9 +56,9 @@ pub fn run(
 
     let response = MessageBuilder::new()
         .push_bold_safe(&command.user.name)
-        .push(" à ajouté l'insulte: ")
-        .push(&new_trash)
-        .push(" à la banque d'insultes")
+        .push(" à suprimé l'insulte n° ")
+        .push(&deleted)
+        .push(" de banque d'insultes")
         .build();
 
     format!("{}", response)
@@ -63,13 +66,13 @@ pub fn run(
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
     command
-        .name("add_bullshit")
-        .description("ajoute une balle perdu suplémentaire à la liste")
+        .name("delete_bullshit")
+        .description("suprime une balle perdu de la liste")
         .create_option(|option| {
             option
-                .name("trash_quote")
-                .description("the trash quote")
-                .kind(CommandOptionType::String)
+                .name("numéro")
+                .description("le numéro de la phrase à suprimer")
+                .kind(CommandOptionType::Integer)
                 .required(true)
         })
 }

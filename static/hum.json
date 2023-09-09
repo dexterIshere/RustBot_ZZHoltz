@@ -1,1 +1,19 @@
-{"insultes":["fdp","ba nik ta mère","jtaime pas","pute pute","pathétique merde","la callote de t morts","t'es fada salope","bougre de zouave","vilain","jeune effronté","dinguerie si j't'encule pas","que dieux pardone ta stupidité fdp","toi et moi , octogone mtn","je v te défoncer et arroser mes carrotes avec ton sang","mange tes grands morts"]}
+{
+  "insultes": {
+    "1": "fdp",
+    "11": "dinguerie si j't'encule pas",
+    "12": "que dieux pardone ta stupidité fdp",
+    "13": "toi et moi , octogone mtn",
+    "14": "je v te défoncer et arroser mes carrotes avec ton sang",
+    "15": "mange tes grands morts",
+    "16": "construit un pont puis jette-t'en",
+    "2": "ba nik ta mère",
+    "3": "jtaime pas",
+    "4": "pute pute",
+    "5": "pathétique merde",
+    "6": "la callote de t morts",
+    "7": "t'es fada salope",
+    "8": "bougre de zouave",
+    "9": "vilain"
+  }
+}

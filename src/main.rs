@@ -8,8 +8,12 @@ use serenity::async_trait;
 use serenity::model::application::interaction::{Interaction, InteractionResponseType};
 use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
+use serenity::model::prelude::Message;
 use serenity::prelude::*;
 use shuttle_secrets::SecretStore;
+
+use commands::admin::format_list::format_list;
+use commands::admin::return_trash_list::list;
 struct Handler {
     guild_id: String,
     static_folder: PathBuf,
@@ -17,16 +21,27 @@ struct Handler {
 
 #[async_trait]
 impl EventHandler for Handler {
+    async fn message(&self, context: Context, msg: Message) {
+        if msg.content == "!test" {
+            println!("Message reçu: {}", msg.content);
+        }
+        list(context.clone(), msg.clone(), &self.static_folder).await;
+
+        format_list(context, msg, &self.static_folder).await;
+    }
+
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
             println!("Received command interaction: {:#?}", command);
 
             let content = match command.data.name.as_str() {
                 "insulte" => commands::insultes::run(&command.data.options),
-                "trash_list" => {
-                    commands::return_trash_list::run(&command.data.options, &self.static_folder)
-                }
                 "add_bullshit" => commands::add_bullshit::run(
+                    &command.data.options,
+                    &self.static_folder,
+                    &command,
+                ),
+                "delete_bullshit" => commands::admin::delete_trash::run(
                     &command.data.options,
                     &self.static_folder,
                     &command,
@@ -34,6 +49,7 @@ impl EventHandler for Handler {
                 "balle_perdu" => {
                     commands::fast_trash::run(&command.data.options, &self.static_folder)
                 }
+
                 _ => "not implemented :(".to_string(),
             };
 
@@ -61,7 +77,7 @@ impl EventHandler for Handler {
                 .create_application_command(|command| commands::fast_trash::register(command))
                 .create_application_command(|command| commands::add_bullshit::register(command))
                 .create_application_command(|command| {
-                    commands::return_trash_list::register(command)
+                    commands::admin::delete_trash::register(command)
                 })
         })
         .await;

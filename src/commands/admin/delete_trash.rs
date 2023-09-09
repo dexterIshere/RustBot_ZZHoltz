@@ -22,12 +22,13 @@ pub fn run(
         .as_ref()
         .expect("chiffre invalide");
 
-    let delete_key = match delete_option {
-        CommandDataOptionValue::Integer(int) => int.to_string(),
-        _ => return "Type de donnée invalide".to_string(),
-    };
+    let mut deleted: u64 = 0;
 
-    delete_trash(pool, &delete_key);
+    if let CommandDataOptionValue::Integer(int) = delete_option {
+        deleted = *int as u64;
+    }
+
+    delete_trash(pool, deleted.try_into().unwrap());
 
     let response = MessageBuilder::new()
         .push_bold_safe(&command.user.name)

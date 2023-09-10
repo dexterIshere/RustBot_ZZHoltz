@@ -1,10 +1,10 @@
 mod commands;
 mod models;
 
-use std::path::PathBuf;
+// use std::path::PathBuf;
 
 use anyhow::anyhow;
-use commands::admin::format_list::format_list;
+// use commands::admin::format_list::format_list;
 use commands::admin::return_trash_list::list;
 use serenity::async_trait;
 use serenity::model::application::interaction::{Interaction, InteractionResponseType};
@@ -16,15 +16,15 @@ use shuttle_secrets::SecretStore;
 use sqlx::{Executor, PgPool};
 struct Handler {
     guild_id: String,
-    static_folder: PathBuf,
+    // static_folder: PathBuf,
     database: PgPool,
 }
 
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, context: Context, msg: Message) {
-        list(context.clone(), msg.clone(), &self.static_folder).await;
-        format_list(context, msg, &self.static_folder).await;
+        list(context.clone(), msg.clone(), &self.database).await;
+        // format_list(context, msg, &self.static_folder).await;
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
@@ -46,7 +46,7 @@ impl EventHandler for Handler {
                     .await
                 }
                 "balle_perdu" => {
-                    commands::fast_trash::run(&command.data.options, &self.static_folder)
+                    commands::fast_trash::run(&command.data.options, &self.database).await
                 }
 
                 _ => "not implemented :(".to_string(),
@@ -110,13 +110,11 @@ impl EventHandler for Handler {
 async fn serenity(
     #[shuttle_secrets::Secrets] secret_store: SecretStore,
     #[shuttle_shared_db::Postgres(
-        local_uri = "postgresql://postgres:{secrets.PASSWORD}@db.rqjsysvkzoxcdutzvudt.supabase.co:5432/postgres"
+        local_uri = "postgresql://postgres:{secrets.PASSWORD}@db.uoioffqyfmxniqfrsmfa.supabase.co:5432/postgres"
     )]
     pool: PgPool,
-    #[shuttle_static_folder::StaticFolder] static_folder: PathBuf,
+    // #[shuttle_static_folder::StaticFolder] static_folder: PathBuf,
 ) -> shuttle_serenity::ShuttleSerenity {
-    commands::fast_trash::load_insultes(&static_folder);
-
     // Get the discord token set in `Secrets.toml`
     let token = if let Some(token) = secret_store.get("DISCORD_TOKEN") {
         token
@@ -139,7 +137,7 @@ async fn serenity(
     let handler = Handler {
         database: pool,
         guild_id,
-        static_folder,
+        // static_folder,
     };
 
     // Set gateway intents, which decides what events the bot will be notified about

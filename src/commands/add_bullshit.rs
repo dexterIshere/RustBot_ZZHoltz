@@ -30,9 +30,10 @@ pub async fn run(
     let _ = add_trash(pool, &new_trash).await;
 
     let response = MessageBuilder::new()
-        .push_bold_safe(&command.user.name)
-        .push(" à ajouté l'insulte: ")
-        .push(&new_trash)
+        .push_bold_safe("MaîTre !! ")
+        .mention(&command.user.id)
+        .push(" a ajouté l'insulte : ")
+        .push_codeblock(&new_trash, Some("rust"))
         .push(" à la banque d'insultes")
         .build();
 

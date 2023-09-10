@@ -1,36 +1,16 @@
+use crate::models::sentences::select_random_sentence;
 use serenity::builder::CreateApplicationCommand;
 use serenity::model::prelude::command::CommandOptionType;
 use serenity::model::prelude::interaction::application_command::{
     CommandDataOption, CommandDataOptionValue,
 };
-use std::fs;
-use std::path::PathBuf;
+use sqlx::PgPool;
 
-use rand::Rng;
-
-pub fn load_insultes(static_folder: &PathBuf) -> Vec<String> {
-    let full_path = static_folder.join("hum.json");
-    let data = fs::read_to_string(full_path).expect("Bruh wrong path");
-    let json: serde_json::Value = serde_json::from_str(&data).expect("pas formater");
-
-    let mut insultes = Vec::new();
-
-    if let Some(insultes_map) = json["insultes"].as_object() {
-        for (_key, value) in insultes_map {
-            if let Some(insulte) = value.as_str() {
-                insultes.push(insulte.to_string());
-            }
-        }
-    }
-
-    insultes
-}
-
-pub fn run(options: &[CommandDataOption], static_folder: &PathBuf) -> String {
-    let insultes = load_insultes(static_folder);
-    let mut rng = rand::thread_rng();
-    let insulte = insultes[rng.gen_range(0..insultes.len())].clone();
-
+pub async fn run(options: &[CommandDataOption], pool: &PgPool) -> String {
+    let insulte = match select_random_sentence(&pool).await {
+        Ok(val) => val,
+        Err(_) => "Une erreur est survenue".to_string(), // Vous pouvez gérer l'erreur comme vous le souhaitez
+    };
     let victime_option = options
         .get(0)
         .expect("Expected victim option")

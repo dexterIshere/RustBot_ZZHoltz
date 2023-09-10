@@ -9,7 +9,7 @@ use serenity::model::prelude::interaction::application_command::{
 use serenity::utils::MessageBuilder;
 use sqlx::PgPool;
 
-pub fn run(
+pub async fn run(
     options: &[CommandDataOption],
     command: &ApplicationCommandInteraction,
     pool: &PgPool,
@@ -27,7 +27,7 @@ pub fn run(
         new_trash = msg.clone();
     }
 
-    add_trash(pool, &new_trash);
+    let _ = add_trash(pool, &new_trash).await;
 
     let response = MessageBuilder::new()
         .push_bold_safe(&command.user.name)

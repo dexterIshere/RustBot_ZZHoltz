@@ -10,7 +10,7 @@ use serenity::model::Permissions;
 use serenity::utils::MessageBuilder;
 use sqlx::PgPool;
 
-pub fn run(
+pub async fn run(
     options: &[CommandDataOption],
     command: &ApplicationCommandInteraction,
     pool: &PgPool,
@@ -28,7 +28,7 @@ pub fn run(
         deleted = *int as u64;
     }
 
-    delete_trash(pool, deleted.try_into().unwrap());
+    let _ = delete_trash(pool, deleted.try_into().unwrap()).await;
 
     let response = MessageBuilder::new()
         .push_bold_safe(&command.user.name)

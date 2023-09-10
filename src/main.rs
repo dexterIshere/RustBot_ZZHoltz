@@ -35,12 +35,16 @@ impl EventHandler for Handler {
                 "insulte" => commands::insultes::run(&command.data.options),
                 "add_bullshit" => {
                     commands::add_bullshit::run(&command.data.options, &command, &self.database)
+                        .await
                 }
-                "delete_bullshit" => commands::admin::delete_trash::run(
-                    &command.data.options,
-                    &command,
-                    &self.database,
-                ),
+                "delete_bullshit" => {
+                    commands::admin::delete_trash::run(
+                        &command.data.options,
+                        &command,
+                        &self.database,
+                    )
+                    .await
+                }
                 "balle_perdu" => {
                     commands::fast_trash::run(&command.data.options, &self.static_folder)
                 }
@@ -104,8 +108,11 @@ impl EventHandler for Handler {
 
 #[shuttle_runtime::main]
 async fn serenity(
-    #[shuttle_shared_db::Postgres] pool: PgPool,
     #[shuttle_secrets::Secrets] secret_store: SecretStore,
+    #[shuttle_shared_db::Postgres(
+        local_uri = "postgresql://postgres:{secrets.PASSWORD}@db.rqjsysvkzoxcdutzvudt.supabase.co:5432/postgres"
+    )]
+    pool: PgPool,
     #[shuttle_static_folder::StaticFolder] static_folder: PathBuf,
 ) -> shuttle_serenity::ShuttleSerenity {
     commands::fast_trash::load_insultes(&static_folder);

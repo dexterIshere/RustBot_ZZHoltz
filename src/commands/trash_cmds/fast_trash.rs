@@ -9,7 +9,7 @@ use sqlx::PgPool;
 pub async fn run(options: &[CommandDataOption], pool: &PgPool) -> String {
     let insulte = match select_random_sentence(&pool).await {
         Ok(val) => val,
-        Err(_) => "Une erreur est survenue".to_string(), // Vous pouvez gérer l'erreur comme vous le souhaitez
+        Err(_) => "Une erreur est survenue".to_string(),
     };
     let victime_option = options
         .get(0)

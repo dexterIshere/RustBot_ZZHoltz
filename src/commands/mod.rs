@@ -1,5 +1,3 @@
-pub mod admin;
-
-pub mod add_bullshit;
-pub mod fast_trash;
-pub mod insultes;
+pub mod poke_cmds;
+pub mod shared;
+pub mod trash_cmds;

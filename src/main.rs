@@ -1,11 +1,15 @@
+mod api;
 mod commands;
 mod models;
 
 // use std::path::PathBuf;
 
+use std::sync::Arc;
+
 use anyhow::anyhow;
+use serenity::prelude::RwLock;
 // use commands::admin::format_list::format_list;
-use commands::admin::return_trash_list::list;
+use commands::trash_cmds::admin::return_trash_list::list;
 use serenity::async_trait;
 use serenity::model::application::interaction::{Interaction, InteractionResponseType};
 use serenity::model::gateway::Ready;
@@ -14,6 +18,8 @@ use serenity::model::prelude::Message;
 use serenity::prelude::*;
 use shuttle_secrets::SecretStore;
 use sqlx::{Executor, PgPool};
+
+use crate::commands::shared::states::QuizState;
 struct Handler {
     guild_id: String,
     // static_folder: PathBuf,
@@ -30,27 +36,64 @@ impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
             println!("Received command interaction: {:#?}", command);
+            let content: String;
 
-            let content = match command.data.name.as_str() {
-                "insulte" => commands::insultes::run(&command.data.options),
+            content = match command.data.name.as_str() {
+                "insulte" => commands::trash_cmds::insultes::run(&command.data.options),
+                "test" => commands::poke_cmds::test::run(&command.data.options).await,
                 "add_bullshit" => {
-                    commands::add_bullshit::run(&command.data.options, &command, &self.database)
-                        .await
-                }
-                "delete_bullshit" => {
-                    commands::admin::delete_trash::run(
+                    commands::trash_cmds::add_bullshit::run(
                         &command.data.options,
                         &command,
                         &self.database,
                     )
                     .await
                 }
+                "delete_bullshit" => {
+                    commands::trash_cmds::admin::delete_trash::run(
+                        &command.data.options,
+                        &command,
+                        &self.database,
+                    )
+                    .await
+                }
+
                 "balle_perdu" => {
-                    commands::fast_trash::run(&command.data.options, &self.database).await
+                    commands::trash_cmds::fast_trash::run(&command.data.options, &self.database)
+                        .await
                 }
 
                 _ => "not implemented :(".to_string(),
             };
+            if command.data.name == "quiz" {
+                let data = ctx.data.read().await;
+                let quiz_state_lock = data
+                    .get::<QuizState>()
+                    .expect("Expected QuizState in TypeMap");
+                let quiz_state = quiz_state_lock.read().await;
+
+                if *quiz_state {
+                    if let Err(why) = command
+                        .create_interaction_response(&ctx.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| {
+                                    message.content("Un quiz est déjà en cours.")
+                                })
+                        })
+                        .await
+                    {
+                        println!("Cannot respond to slash command: {}", why);
+                    }
+                } else {
+                    commands::poke_cmds::launch_quiz::quizz_run(
+                        &command.data.options,
+                        &command,
+                        ctx.clone(),
+                    )
+                    .await;
+                }
+            }
 
             if let Err(why) = command
                 .create_interaction_response(&ctx.http, |response| {
@@ -68,16 +111,29 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
 
+        let mut quiz_data = ctx.data.write().await;
+        quiz_data.insert::<QuizState>(Arc::new(RwLock::new(false)));
+
         let guild_id = GuildId(self.guild_id.parse().unwrap());
 
         let commands = GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
             commands
-                .create_application_command(|command| commands::insultes::register(command))
-                .create_application_command(|command| commands::fast_trash::register(command))
-                .create_application_command(|command| commands::add_bullshit::register(command))
                 .create_application_command(|command| {
-                    commands::admin::delete_trash::register(command)
+                    commands::trash_cmds::insultes::register(command)
                 })
+                .create_application_command(|command| {
+                    commands::trash_cmds::fast_trash::register(command)
+                })
+                .create_application_command(|command| {
+                    commands::trash_cmds::add_bullshit::register(command)
+                })
+                .create_application_command(|command| {
+                    commands::trash_cmds::admin::delete_trash::register(command)
+                })
+                .create_application_command(|command| {
+                    commands::poke_cmds::launch_quiz::register(command)
+                })
+                .create_application_command(|command| commands::poke_cmds::test::register(command))
         })
         .await;
 

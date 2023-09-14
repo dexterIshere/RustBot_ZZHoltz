@@ -2,3 +2,8 @@ CREATE TABLE IF NOT EXISTS insultes (
     id SERIAL PRIMARY KEY,  
     insulte TEXT NOT NULL 
 );
+
+CREATE TABLE IF NOT EXISTS winners (
+    id SERIAL PRIMARY KEY,  
+    winner TEXT NOT NULL 
+);

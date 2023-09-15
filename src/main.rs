@@ -4,10 +4,10 @@ mod models;
 
 // use std::path::PathBuf;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use serenity::prelude::RwLock;
 // use commands::admin::format_list::format_list;
 use commands::trash_cmds::admin::return_trash_list::list;
 use serenity::async_trait;
@@ -63,35 +63,27 @@ impl EventHandler for Handler {
                         .await
                 }
 
-                _ => "not implemented :(".to_string(),
+                _ => "not possible to launch now :(".to_string(),
             };
             if command.data.name == "quiz" {
                 let data = ctx.data.read().await;
-                let quiz_state_lock = data
+                let quiz_state = data
                     .get::<QuizState>()
                     .expect("Expected QuizState in TypeMap");
-                let quiz_state = quiz_state_lock.read().await;
 
-                if *quiz_state {
-                    if let Err(why) = command
-                        .create_interaction_response(&ctx.http, |response| {
-                            response
-                                .kind(InteractionResponseType::ChannelMessageWithSource)
-                                .interaction_response_data(|message| {
-                                    message.content("Un quiz est déjà en cours.")
-                                })
-                        })
-                        .await
-                    {
-                        println!("Cannot respond to slash command: {}", why);
+                match quiz_state.compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
+                {
+                    Ok(_) => {
+                        commands::poke_cmds::launch_quiz::quizz_run(
+                            &command.data.options,
+                            &command,
+                            ctx.clone(),
+                        )
+                        .await;
                     }
-                } else {
-                    commands::poke_cmds::launch_quiz::quizz_run(
-                        &command.data.options,
-                        &command,
-                        ctx.clone(),
-                    )
-                    .await;
+                    Err(_) => {
+                        println!("Quiz déjà en cours");
+                    }
                 }
             }
 
@@ -112,7 +104,7 @@ impl EventHandler for Handler {
         println!("{} is connected!", ready.user.name);
 
         let mut quiz_data = ctx.data.write().await;
-        quiz_data.insert::<QuizState>(Arc::new(RwLock::new(false)));
+        quiz_data.insert::<QuizState>(Arc::new(AtomicBool::new(false)));
 
         let guild_id = GuildId(self.guild_id.parse().unwrap());
 

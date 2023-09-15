@@ -14,8 +14,6 @@ use serenity::model::prelude::ReactionType;
 use serenity::prelude::Context;
 use serenity::utils::MessageBuilder;
 
-use crate::commands::shared::states::QuizState;
-
 fn quiz_button(name: &str, emoji: ReactionType) -> CreateButton {
     let mut b = CreateButton::default();
     b.custom_id(name);
@@ -50,34 +48,17 @@ pub async fn quizz_run(
     if let CommandDataOptionValue::String(msg) = quiz_theme {
         theme = msg.clone();
     }
+    let param = MessageBuilder::new()
+        .mention(&command.user.id)
+        .push(" souhaite faire un quiz de ")
+        .push_bold(&theme)
+        .build();
 
-    let quiz_data = ctx.data.read().await;
-    let quiz_state_lock = quiz_data
-        .get::<QuizState>()
-        .expect("Expected QuizState in TypeMap");
-    let quiz_state = quiz_state_lock.read().await;
-    println!("{}comment ça ce passe", quiz_state);
-    let mut quiz_state_write = quiz_state_lock.write().await;
-
-    if *quiz_state {
-        command
-            .channel_id
-            .say(&ctx.http, "Un quiz est déjà en cours.")
-            .await
-            .expect("Impossible d'envoyer le message.");
-    } else {
-        let param = MessageBuilder::new()
-            .mention(&command.user.id)
-            .push(" souhaite faire un quiz de ")
-            .push_bold(&theme)
-            .build();
-
-        match theme.as_str() {
-            "Pokemon" => run_pokemon_quizz(ctx.clone(), param, command).await,
-            "Drapeaux" => run_flags_quizz(ctx.clone(), param, command).await,
-            _ => {
-                println!("Thème inconnu");
-            }
+    match theme.as_str() {
+        "Pokemon" => run_pokemon_quizz(ctx.clone(), param, command).await,
+        "Drapeaux" => run_flags_quizz(ctx.clone(), param, command).await,
+        _ => {
+            println!("Thème inconnu");
         }
     }
 }

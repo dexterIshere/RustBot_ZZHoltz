@@ -2,18 +2,15 @@ use crate::api::client::init_clients::get_poke_client;
 use serde_json::Value;
 use surf::Error;
 
-pub async fn test() -> Result<String, Error> {
+pub async fn fetch_pokemon_data(id: u64) -> Result<(String, String), Error> {
     let client = get_poke_client().await?;
 
-    let mut res = client.get("pokemon/1").send().await?;
+    let mut res = client.get(format!("pokemon/{}", id)).send().await?;
 
     let body: Value = res.body_json().await?;
 
-    match body["name"]["fr"].as_str() {
-        Some(name) => Ok(name.to_string()),
-        None => Err(surf::Error::from_str(
-            400,
-            "Champ 'name.fr' manquant ou invalide",
-        )),
-    }
+    let image = body["sprites"]["regular"].as_str().unwrap_or_default();
+    let name = body["name"]["fr"].as_str().unwrap_or_default();
+
+    Ok((image.to_string(), name.to_string()))
 }

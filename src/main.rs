@@ -1,5 +1,6 @@
 mod api;
 mod commands;
+mod db;
 mod models;
 
 // use std::path::PathBuf;
@@ -10,6 +11,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 // use commands::admin::format_list::format_list;
 use commands::trash_cmds::admin::return_trash_list::list;
+use db::connections::redis_db::init_redis_con;
 use serenity::async_trait;
 use serenity::model::application::interaction::{Interaction, InteractionResponseType};
 use serenity::model::gateway::Ready;
@@ -24,6 +26,7 @@ struct Handler {
     guild_id: String,
     // static_folder: PathBuf,
     database: PgPool,
+    redis_con: Arc<Mutex<redis::Connection>>,
 }
 
 #[async_trait]
@@ -40,7 +43,6 @@ impl EventHandler for Handler {
 
             content = match command.data.name.as_str() {
                 "insulte" => commands::trash_cmds::insultes::run(&command.data.options),
-                "test" => commands::poke_cmds::test::run(&command.data.options).await,
                 "add_bullshit" => {
                     commands::trash_cmds::add_bullshit::run(
                         &command.data.options,
@@ -78,6 +80,7 @@ impl EventHandler for Handler {
                             &command.data.options,
                             &command,
                             ctx.clone(),
+                            &self.redis_con,
                         )
                         .await;
                     }
@@ -125,7 +128,6 @@ impl EventHandler for Handler {
                 .create_application_command(|command| {
                     commands::poke_cmds::launch_quiz::register(command)
                 })
-                .create_application_command(|command| commands::poke_cmds::test::register(command))
         })
         .await;
 
@@ -163,7 +165,6 @@ async fn serenity(
     pool: PgPool,
     // #[shuttle_static_folder::StaticFolder] static_folder: PathBuf,
 ) -> shuttle_serenity::ShuttleSerenity {
-    // Get the discord token set in `Secrets.toml`
     let token = if let Some(token) = secret_store.get("DISCORD_TOKEN") {
         token
     } else {
@@ -176,6 +177,10 @@ async fn serenity(
         return Err(anyhow!("'GUILD_ID' was not found").into());
     };
 
+    //redis
+    let redis_con = init_redis_con().expect("pas de connection à redis");
+    let redis_con = Arc::new(Mutex::new(redis_con));
+
     // Run the schema migration
     anyhow::Context::context(
         pool.execute(include_str!("../schema.sql")).await,
@@ -186,6 +191,7 @@ async fn serenity(
         database: pool,
         guild_id,
         // static_folder,
+        redis_con,
     };
 
     // Set gateway intents, which decides what events the bot will be notified about

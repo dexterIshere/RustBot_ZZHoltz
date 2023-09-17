@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::Duration;
 
 use serenity::builder::CreateApplicationCommand;
@@ -13,6 +14,10 @@ use serenity::model::prelude::InteractionResponseType;
 use serenity::model::prelude::ReactionType;
 use serenity::prelude::Context;
 use serenity::utils::MessageBuilder;
+use tokio::sync::Mutex;
+
+use crate::commands::poke_cmds::quiz::generate_questions::create_question;
+use crate::models::quiz_logic::register_players;
 
 fn quiz_button(name: &str, emoji: ReactionType) -> CreateButton {
     let mut b = CreateButton::default();
@@ -35,19 +40,41 @@ pub async fn quizz_run(
     options: &[CommandDataOption],
     command: &ApplicationCommandInteraction,
     ctx: Context,
+    redis_con: &Arc<Mutex<redis::Connection>>,
 ) {
     let quiz_theme = options
         .get(0)
-        .expect("Expected user option")
+        .expect("Expected theme option")
         .resolved
         .as_ref()
-        .expect("Expected user object");
+        .expect("Expected theme object");
+    let quiz_timer = options
+        .get(1)
+        .expect("Expected timer")
+        .resolved
+        .as_ref()
+        .expect("Expected timer object");
+    let quiz_score = options
+        .get(2)
+        .expect("Expected score")
+        .resolved
+        .as_ref()
+        .expect("Expected score object");
 
     let mut theme = String::new();
+    let mut timer: i64 = 0;
+    let mut score: i64 = 0;
 
     if let CommandDataOptionValue::String(msg) = quiz_theme {
         theme = msg.clone();
     }
+    if let CommandDataOptionValue::Integer(msg) = quiz_timer {
+        timer = *msg;
+    }
+    if let CommandDataOptionValue::Integer(msg) = quiz_score {
+        score = *msg;
+    }
+
     let param = MessageBuilder::new()
         .mention(&command.user.id)
         .push(" souhaite faire un quiz de ")
@@ -55,15 +82,22 @@ pub async fn quizz_run(
         .build();
 
     match theme.as_str() {
-        "Pokemon" => run_pokemon_quizz(ctx.clone(), param, command).await,
-        "Drapeaux" => run_flags_quizz(ctx.clone(), param, command).await,
+        "Pokemon" => init_pokemon_quizz(ctx.clone(), param, command, redis_con, timer, score).await,
+        "Drapeaux" => init_flags_quizz(ctx.clone(), param, command, redis_con, timer, score).await,
         _ => {
             println!("Thème inconnu");
         }
     }
 }
 
-async fn run_pokemon_quizz(ctx: Context, param: String, command: &ApplicationCommandInteraction) {
+async fn init_pokemon_quizz(
+    ctx: Context,
+    param: String,
+    command: &ApplicationCommandInteraction,
+    redis_con: &Arc<Mutex<redis::Connection>>,
+    timer: i64,
+    score: i64,
+) {
     let mut user_ids: HashSet<u64> = HashSet::new();
     let mut player_count = 0;
 
@@ -89,9 +123,9 @@ async fn run_pokemon_quizz(ctx: Context, param: String, command: &ApplicationCom
                 .await
             {
                 if interaction.data.custom_id == "I play" {
-                    if user_ids.contains(&interaction.user.id.0) {
+                    if user_ids.contains(&(interaction.user.id.0)) {
                         player_count -= 1;
-                        user_ids.remove(&interaction.user.id.0);
+                        user_ids.remove(&(interaction.user.id.0));
                     } else {
                         player_count += 1;
                         user_ids.insert(interaction.user.id.0);
@@ -119,14 +153,26 @@ async fn run_pokemon_quizz(ctx: Context, param: String, command: &ApplicationCom
                         .unwrap();
                 }
             } else {
+                register_players(redis_con, &user_ids)
+                    .await
+                    .expect("not registered");
+
+                println!("{},{}", timer, score);
+                message.delete(&ctx).await.unwrap();
                 break;
             }
         }
-        user_ids.clear();
     }
 }
 
-async fn run_flags_quizz(ctx: Context, param: String, command: &ApplicationCommandInteraction) {
+async fn init_flags_quizz(
+    ctx: Context,
+    param: String,
+    command: &ApplicationCommandInteraction,
+    redis_con: &Arc<Mutex<redis::Connection>>,
+    timer: i64,
+    score: i64,
+) {
     let mut user_ids: HashSet<u64> = HashSet::new();
     let mut player_count = 0;
 
@@ -152,9 +198,9 @@ async fn run_flags_quizz(ctx: Context, param: String, command: &ApplicationComma
                 .await
             {
                 if interaction.data.custom_id == "I play" {
-                    if user_ids.contains(&interaction.user.id.0) {
+                    if user_ids.contains(&(interaction.user.id.0)) {
                         player_count -= 1;
-                        user_ids.remove(&interaction.user.id.0);
+                        user_ids.remove(&(interaction.user.id.0));
                     } else {
                         player_count += 1;
                         user_ids.insert(interaction.user.id.0);
@@ -182,10 +228,14 @@ async fn run_flags_quizz(ctx: Context, param: String, command: &ApplicationComma
                         .unwrap();
                 }
             } else {
+                register_players(redis_con, &user_ids)
+                    .await
+                    .expect("not registered");
+                println!("{},{}", timer, score);
+                message.delete(&ctx).await.unwrap();
                 break;
             }
         }
-        user_ids.clear();
     }
 }
 
@@ -201,5 +251,23 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
                 .required(true)
                 .add_string_choice("Pokemon", "Pokemon")
                 .add_string_choice("Drapeaux", "Drapeaux")
+        })
+        .create_option(|option| {
+            option
+                .name("timer")
+                .description("le temps de réponse")
+                .kind(CommandOptionType::Integer)
+                .required(true)
+                .min_int_value(5)
+                .max_int_value(164)
+        })
+        .create_option(|option| {
+            option
+                .name("objectif")
+                .description("le score requis pour gagner la partie")
+                .kind(CommandOptionType::Integer)
+                .required(true)
+                .min_int_value(1)
+                .max_int_value(50)
         })
 }

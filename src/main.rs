@@ -11,7 +11,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 // use commands::admin::format_list::format_list;
 use commands::trash_cmds::admin::return_trash_list::list;
-use db::connections::redis_db::init_redis_con;
+use db::connections::redis_db::RedisConManager;
 use serenity::async_trait;
 use serenity::model::application::interaction::{Interaction, InteractionResponseType};
 use serenity::model::gateway::Ready;
@@ -26,7 +26,7 @@ struct Handler {
     guild_id: String,
     // static_folder: PathBuf,
     database: PgPool,
-    redis_con: Arc<Mutex<redis::Connection>>,
+    redis_manager: RedisConManager,
 }
 
 #[async_trait]
@@ -80,7 +80,7 @@ impl EventHandler for Handler {
                             &command.data.options,
                             &command,
                             ctx.clone(),
-                            &self.redis_con,
+                            &self.redis_manager,
                         )
                         .await;
                     }
@@ -178,8 +178,7 @@ async fn serenity(
     };
 
     //redis
-    let redis_con = init_redis_con().expect("pas de connection à redis");
-    let redis_con = Arc::new(Mutex::new(redis_con));
+    let redis_manager = RedisConManager::new().expect("Failed to initialize RedisConManager");
 
     // Run the schema migration
     anyhow::Context::context(
@@ -191,7 +190,7 @@ async fn serenity(
         database: pool,
         guild_id,
         // static_folder,
-        redis_con,
+        redis_manager,
     };
 
     // Set gateway intents, which decides what events the bot will be notified about

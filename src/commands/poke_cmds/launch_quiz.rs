@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::path::Path;
 use std::time::Duration;
 
 use serenity::builder::CreateApplicationCommand;
@@ -14,9 +14,9 @@ use serenity::model::prelude::InteractionResponseType;
 use serenity::model::prelude::ReactionType;
 use serenity::prelude::Context;
 use serenity::utils::MessageBuilder;
-use tokio::sync::Mutex;
 
-use crate::commands::poke_cmds::quiz::generate_questions::create_question;
+use crate::commands::poke_cmds::quiz::generate_questions::register_and_create;
+use crate::db::connections::redis_db::RedisConManager;
 use crate::models::quiz_logic::register_players;
 
 fn quiz_button(name: &str, emoji: ReactionType) -> CreateButton {
@@ -40,7 +40,7 @@ pub async fn quizz_run(
     options: &[CommandDataOption],
     command: &ApplicationCommandInteraction,
     ctx: Context,
-    redis_con: &Arc<Mutex<redis::Connection>>,
+    redis_manager: &RedisConManager,
 ) {
     let quiz_theme = options
         .get(0)
@@ -81,25 +81,10 @@ pub async fn quizz_run(
         .push_bold(&theme)
         .build();
 
-    match theme.as_str() {
-        "Pokemon" => init_pokemon_quizz(ctx.clone(), param, command, redis_con, timer, score).await,
-        "Drapeaux" => init_flags_quizz(ctx.clone(), param, command, redis_con, timer, score).await,
-        _ => {
-            println!("Thème inconnu");
-        }
-    }
-}
-
-async fn init_pokemon_quizz(
-    ctx: Context,
-    param: String,
-    command: &ApplicationCommandInteraction,
-    redis_con: &Arc<Mutex<redis::Connection>>,
-    timer: i64,
-    score: i64,
-) {
     let mut user_ids: HashSet<u64> = HashSet::new();
     let mut player_count = 0;
+    let filepath = format!("./static/{}.jpg", theme);
+    let path = Path::new(&filepath);
 
     let m = command
         .channel_id
@@ -111,7 +96,7 @@ async fn init_pokemon_quizz(
                         r.add_button(counter("player_nbr", "nombre de joueur : 0"))
                     })
                 })
-                .add_file("./static/pokequiz.jpg")
+                .add_file(path)
         })
         .await;
 
@@ -153,84 +138,10 @@ async fn init_pokemon_quizz(
                         .unwrap();
                 }
             } else {
-                register_players(redis_con, &user_ids)
+                register_players(redis_manager, &user_ids).expect("not registered");
+                register_and_create(&ctx, command.channel_id, redis_manager)
                     .await
-                    .expect("not registered");
-
-                println!("{},{}", timer, score);
-                message.delete(&ctx).await.unwrap();
-                break;
-            }
-        }
-    }
-}
-
-async fn init_flags_quizz(
-    ctx: Context,
-    param: String,
-    command: &ApplicationCommandInteraction,
-    redis_con: &Arc<Mutex<redis::Connection>>,
-    timer: i64,
-    score: i64,
-) {
-    let mut user_ids: HashSet<u64> = HashSet::new();
-    let mut player_count = 0;
-
-    let m = command
-        .channel_id
-        .send_message(&ctx, |m| {
-            m.content(&param)
-                .components(|c| {
-                    c.create_action_row(|r| {
-                        r.add_button(quiz_button("I play", "🤙".parse().unwrap()));
-                        r.add_button(counter("player_nbr", "nombre de joueur : 0"))
-                    })
-                })
-                .add_file("./static/drapeaux.jpg")
-        })
-        .await;
-
-    if let Ok(mut message) = m {
-        loop {
-            if let Some(interaction) = message
-                .await_component_interaction(&ctx)
-                .timeout(Duration::from_secs(15))
-                .await
-            {
-                if interaction.data.custom_id == "I play" {
-                    if user_ids.contains(&(interaction.user.id.0)) {
-                        player_count -= 1;
-                        user_ids.remove(&(interaction.user.id.0));
-                    } else {
-                        player_count += 1;
-                        user_ids.insert(interaction.user.id.0);
-                    }
-
-                    message
-                        .edit(&ctx, |m| {
-                            m.components(|c| {
-                                c.create_action_row(|r| {
-                                    r.add_button(quiz_button("I play", "🤙".parse().unwrap()));
-                                    r.add_button(counter(
-                                        "player_nbr",
-                                        &format!("nombre de joueur : {}", player_count),
-                                    ))
-                                })
-                            })
-                        })
-                        .await
-                        .unwrap();
-                    interaction
-                        .create_interaction_response(&ctx, |r| {
-                            r.kind(InteractionResponseType::DeferredUpdateMessage)
-                        })
-                        .await
-                        .unwrap();
-                }
-            } else {
-                register_players(redis_con, &user_ids)
-                    .await
-                    .expect("not registered");
+                    .expect("not send");
                 println!("{},{}", timer, score);
                 message.delete(&ctx).await.unwrap();
                 break;
@@ -259,7 +170,7 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
                 .kind(CommandOptionType::Integer)
                 .required(true)
                 .min_int_value(5)
-                .max_int_value(164)
+                .max_int_value(16)
         })
         .create_option(|option| {
             option

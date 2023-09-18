@@ -1,16 +1,16 @@
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
 
-use redis::{Commands, RedisResult};
-use tokio::sync::Mutex;
+use redis::RedisResult;
 
-pub async fn register_players(
-    redis_con: &Arc<Mutex<redis::Connection>>,
+use crate::db::connections::redis_db::RedisConManager;
+
+pub fn register_players(
+    redis_manager: &RedisConManager,
     user_ids: &HashSet<u64>,
 ) -> RedisResult<()> {
-    let mut con = redis_con.lock().await;
     println!("con successful");
     for user_id in user_ids.iter() {
-        con.set::<u64, i64, ()>(*user_id, 0)?;
+        redis_manager.set(user_id.to_string(), "0".to_string())?;
     }
     Ok(())
 }

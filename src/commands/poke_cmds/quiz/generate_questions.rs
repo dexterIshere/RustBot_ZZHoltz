@@ -2,12 +2,15 @@ use crate::{
     api::pokemons::pokecalls::fetch_pokemon_data, db::connections::redis_db::RedisConManager,
 };
 use rand::Rng;
-use serenity::{model::prelude::ChannelId, prelude::Context, utils::MessageBuilder};
+use serenity::{builder::CreateEmbed, model::prelude::ChannelId, prelude::Context};
 
-pub async fn register_and_create(
+use super::quiz_builder::create_countdown;
+
+pub async fn ask_question(
     ctx: &Context,
     channel_id: ChannelId,
     redis_manager: &RedisConManager,
+    timer: i64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     loop {
         let random_id = rand::thread_rng().gen_range(1..=1010);
@@ -15,16 +18,19 @@ pub async fn register_and_create(
         let exists = redis_manager.exists(random_id.to_string())?;
 
         if !exists {
-            let (image, name) = fetch_pokemon_data(random_id).await?;
+            let (image, _name) = fetch_pokemon_data(random_id).await?;
 
-            let content = MessageBuilder::new()
-                .push_bold_line("Qui est ce Pokémon ?")
-                .push_line_safe(image)
-                .push(" LOL ")
-                .push(name)
-                .build();
+            let mut embed = CreateEmbed::default();
+            embed.title("Qui est ce Pokémon ?");
+            embed.image(image);
 
-            if let Err(why) = channel_id.say(&ctx.http, &content).await {
+            let embed_result = channel_id
+                .send_message(&ctx.http, |m| m.set_embed(embed))
+                .await;
+
+            if let Ok(message) = embed_result {
+                create_countdown(&ctx, timer, &message).await;
+            } else if let Err(why) = embed_result {
                 println!("Error sending message: {:?}", why);
             }
 

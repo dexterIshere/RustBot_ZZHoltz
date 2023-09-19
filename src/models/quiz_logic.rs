@@ -8,10 +8,10 @@ pub fn register_players(
     redis_manager: &RedisConManager,
     user_ids: &HashSet<u64>,
 ) -> RedisResult<()> {
-    println!("con successful");
     for user_id in user_ids.iter() {
         redis_manager.set(user_id.to_string(), "0".to_string())?;
     }
+    println!("con successful");
     Ok(())
 }
 

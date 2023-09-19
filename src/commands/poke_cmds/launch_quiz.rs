@@ -15,9 +15,11 @@ use serenity::model::prelude::ReactionType;
 use serenity::prelude::Context;
 use serenity::utils::MessageBuilder;
 
-use crate::commands::poke_cmds::quiz::generate_questions::register_and_create;
+use crate::commands::poke_cmds::quiz::generate_questions::ask_question;
 use crate::db::connections::redis_db::RedisConManager;
 use crate::models::quiz_logic::register_players;
+
+use super::quiz::quiz_builder::create_countdown;
 
 fn quiz_button(name: &str, emoji: ReactionType) -> CreateButton {
     let mut b = CreateButton::default();
@@ -83,6 +85,7 @@ pub async fn quizz_run(
 
     let mut user_ids: HashSet<u64> = HashSet::new();
     let mut player_count = 0;
+    let init_timer: i64 = 8;
     let filepath = format!("./static/{}.jpg", theme);
     let path = Path::new(&filepath);
 
@@ -101,10 +104,11 @@ pub async fn quizz_run(
         .await;
 
     if let Ok(mut message) = m {
+        create_countdown(&ctx, init_timer, &message).await;
         loop {
             if let Some(interaction) = message
                 .await_component_interaction(&ctx)
-                .timeout(Duration::from_secs(15))
+                .timeout(Duration::from_secs(17))
                 .await
             {
                 if interaction.data.custom_id == "I play" {
@@ -138,12 +142,17 @@ pub async fn quizz_run(
                         .unwrap();
                 }
             } else {
+                println!("Break is comming");
+                message.delete(&ctx).await.unwrap();
                 register_players(redis_manager, &user_ids).expect("not registered");
-                register_and_create(&ctx, command.channel_id, redis_manager)
+                println!("ready to quiz");
+
+                ask_question(&ctx, command.channel_id, redis_manager, timer)
                     .await
                     .expect("not send");
+                println!("quiz lanched");
+
                 println!("{},{}", timer, score);
-                message.delete(&ctx).await.unwrap();
                 break;
             }
         }

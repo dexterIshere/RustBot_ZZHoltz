@@ -1,2 +1,2 @@
 pub mod generate_questions;
-pub mod quiz_active;
+pub mod quiz_builder;

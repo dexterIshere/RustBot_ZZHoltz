@@ -1,3 +1,3 @@
-pub mod poke_cmds;
-pub mod shared;
+pub mod quiz_cmds;
+pub mod states;
 pub mod trash_cmds;

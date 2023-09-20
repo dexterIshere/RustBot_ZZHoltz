@@ -11,11 +11,11 @@ impl RedisConManager {
         let _ = dotenvy::dotenv();
         let redis_pwd = dotenvy::var("REDIS_PWD").expect("la var n'est pas définie");
 
-        let redis_url = format!(
+        let _redis_url = format!(
             "redis://default:{}@mutual-gull-31864.upstash.io:31864",
             redis_pwd
         );
-        let client = Client::open(redis_url)?;
+        let client = Client::open("redis://127.0.0.1/")?;
         let redis_con = client.get_connection()?;
 
         println!("con initied");

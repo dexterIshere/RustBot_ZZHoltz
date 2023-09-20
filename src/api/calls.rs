@@ -1,6 +1,7 @@
-use crate::api::client::init_clients::get_poke_client;
 use serde_json::Value;
 use surf::Error;
+
+use super::init_clients::get_poke_client;
 
 pub async fn fetch_pokemon_data(id: u64) -> Result<(String, String), Error> {
     let client = get_poke_client().await?;

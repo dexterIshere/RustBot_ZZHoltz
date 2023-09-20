@@ -21,7 +21,6 @@ use serenity::prelude::*;
 use shuttle_secrets::SecretStore;
 use sqlx::{Executor, PgPool};
 
-use crate::commands::shared::states::QuizState;
 struct Handler {
     guild_id: String,
     // static_folder: PathBuf,
@@ -68,26 +67,13 @@ impl EventHandler for Handler {
                 _ => "not possible to launch now :(".to_string(),
             };
             if command.data.name == "quiz" {
-                let data = ctx.data.read().await;
-                let quiz_state = data
-                    .get::<QuizState>()
-                    .expect("Expected QuizState in TypeMap");
-
-                match quiz_state.compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
-                {
-                    Ok(_) => {
-                        commands::poke_cmds::launch_quiz::quizz_run(
-                            &command.data.options,
-                            &command,
-                            ctx.clone(),
-                            &self.redis_manager,
-                        )
-                        .await;
-                    }
-                    Err(_) => {
-                        println!("Quiz déjà en cours");
-                    }
-                }
+                commands::quiz_cmds::launch_quiz::quizz_run(
+                    &command.data.options,
+                    &command,
+                    ctx.clone(),
+                    self.redis_manager,
+                )
+                .await;
             }
 
             if let Err(why) = command
@@ -106,9 +92,6 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
 
-        let mut quiz_data = ctx.data.write().await;
-        quiz_data.insert::<QuizState>(Arc::new(AtomicBool::new(false)));
-
         let guild_id = GuildId(self.guild_id.parse().unwrap());
 
         let commands = GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
@@ -126,7 +109,7 @@ impl EventHandler for Handler {
                     commands::trash_cmds::admin::delete_trash::register(command)
                 })
                 .create_application_command(|command| {
-                    commands::poke_cmds::launch_quiz::register(command)
+                    commands::quiz_cmds::launch_quiz::register(command)
                 })
         })
         .await;

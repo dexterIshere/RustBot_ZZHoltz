@@ -1,2 +1,2 @@
-pub mod client;
-pub mod pokemons;
+pub mod calls;
+pub mod init_clients;

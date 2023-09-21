@@ -5,9 +5,6 @@ mod models;
 
 // use std::path::PathBuf;
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-
 use anyhow::anyhow;
 // use commands::admin::format_list::format_list;
 use commands::trash_cmds::admin::return_trash_list::list;
@@ -71,7 +68,7 @@ impl EventHandler for Handler {
                     &command.data.options,
                     &command,
                     ctx.clone(),
-                    self.redis_manager,
+                    &self.redis_manager,
                 )
                 .await;
             }

@@ -21,7 +21,7 @@ pub async fn quizz_run(
     options: &[CommandDataOption],
     command: &ApplicationCommandInteraction,
     ctx: Context,
-    redis_manager: RedisConManager,
+    redis_manager: &RedisConManager,
 ) {
     let quiz_theme = options
         .get(0)
@@ -58,7 +58,7 @@ pub async fn quizz_run(
 
     let mut quiz_builder =
         QuizBuilder::build_quiz(redis_manager, ctx, command.channel_id, timer, theme);
-    quiz_builder.lesgo();
+    quiz_builder.lesgo().await;
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

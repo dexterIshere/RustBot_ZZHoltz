@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::Path};
+use std::{collections::HashSet, path::Path, time::Duration};
 
 use serenity::{
     builder::CreateButton,
@@ -6,8 +6,6 @@ use serenity::{
     prelude::Context,
     utils::MessageBuilder,
 };
-
-use super::quiz_logic::create_countdown;
 
 fn quiz_button(name: &str, emoji: ReactionType) -> CreateButton {
     let mut b = CreateButton::default();
@@ -30,15 +28,14 @@ pub async fn register_msg(
     theme: &String,
     channel_id: ChannelId,
     ctx: &Context,
-    countdown: i64,
     user_ids: &mut HashSet<u64>,
+    player_count: &mut u32,
 ) {
     let param = MessageBuilder::new()
-        .push(" souhaite faire un quiz de ")
+        .push("T'as 10 secondes pour t'inscrire au quiz : ")
         .push_bold(&theme)
         .build();
 
-    let mut player_count = 0;
     let filepath = format!("./static/{}.jpg", &theme);
     let path = Path::new(&filepath);
 
@@ -56,18 +53,20 @@ pub async fn register_msg(
         .await;
 
     if let Ok(mut message) = m {
-        create_countdown(&ctx, &message, countdown).await;
         loop {
-            if let Some(interaction) = message.await_component_interaction(&ctx).await {
+            if let Some(interaction) = message
+                .await_component_interaction(&ctx)
+                .timeout(Duration::from_secs(10))
+                .await
+            {
                 if interaction.data.custom_id == "I play" {
                     if user_ids.contains(&(interaction.user.id.0)) {
-                        player_count -= 1;
+                        *player_count -= 1;
                         user_ids.remove(&(interaction.user.id.0));
                     } else {
-                        player_count += 1;
+                        *player_count += 1;
                         user_ids.insert(interaction.user.id.0);
                     }
-
                     message
                         .edit(&ctx, |m| {
                             m.components(|c| {
@@ -89,6 +88,9 @@ pub async fn register_msg(
                         .await
                         .unwrap();
                 }
+            } else {
+                message.delete(&ctx).await.unwrap();
+                break;
             }
         }
     }

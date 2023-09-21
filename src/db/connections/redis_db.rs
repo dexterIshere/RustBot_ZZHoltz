@@ -18,7 +18,7 @@ impl RedisConManager {
         let client = Client::open("redis://127.0.0.1/")?;
         let redis_con = client.get_connection()?;
 
-        println!("con initied");
+        println!("new con initied");
 
         Ok(Self {
             redis_manager: Arc::new(Mutex::new(redis_con)),
@@ -35,5 +35,11 @@ impl RedisConManager {
         let mut con = self.redis_manager.lock().unwrap();
         let exists: bool = con.exists(key)?;
         Ok(exists)
+    }
+
+    pub fn increment_score(&self, key: String, increment: i64) -> RedisResult<i64> {
+        let mut con = self.redis_manager.lock().unwrap();
+        let new_score: i64 = con.incr(key, increment)?;
+        Ok(new_score)
     }
 }

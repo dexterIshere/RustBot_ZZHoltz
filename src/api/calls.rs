@@ -3,7 +3,7 @@ use surf::Error;
 
 use super::init_clients::get_poke_client;
 
-pub async fn fetch_pokemon_data(id: u64) -> Result<(String, String), Error> {
+pub async fn fetch_pokemon_data(id: i32) -> Result<(String, String), Error> {
     let client = get_poke_client().await?;
 
     let mut res = client.get(format!("pokemon/{}", id)).send().await?;

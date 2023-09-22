@@ -3,7 +3,7 @@ use serenity::prelude::*;
 use serenity::utils::MessageBuilder;
 use sqlx::PgPool;
 
-use crate::models::sentences::trash_lister;
+use crate::db::sentences::trash_lister;
 
 pub async fn list(context: Context, msg: Message, pool: &PgPool) {
     let insultes_list = trash_lister(pool).await;

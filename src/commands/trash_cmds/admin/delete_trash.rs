@@ -1,4 +1,4 @@
-use crate::models::sentences::delete_trash;
+use crate::db::sentences::delete_trash;
 
 use serenity::builder::CreateApplicationCommand;
 use serenity::model::prelude::application_command::ApplicationCommandInteraction;

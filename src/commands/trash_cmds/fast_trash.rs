@@ -1,4 +1,4 @@
-use crate::models::sentences::select_random_sentence;
+use crate::db::sentences::select_random_sentence;
 use serenity::builder::CreateApplicationCommand;
 use serenity::model::prelude::command::CommandOptionType;
 use serenity::model::prelude::interaction::application_command::{

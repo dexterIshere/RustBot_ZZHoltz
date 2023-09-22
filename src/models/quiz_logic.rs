@@ -1,15 +1,24 @@
-use std::{collections::HashSet, time::Duration};
+use std::{
+    collections::HashSet,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use rand::Rng;
 use redis::RedisResult;
 use serenity::{
     builder::CreateEmbed,
+    collector::MessageCollectorBuilder,
+    futures::StreamExt,
     model::prelude::{ChannelId, Message, ReactionType},
     prelude::Context,
     utils::MessageBuilder,
 };
 
-use crate::{api::calls::fetch_pokemon_data, db::connections::redis_db::RedisConManager};
+use crate::{api::calls::fetch_pokemon_data, db::redis_db::RedisConManager};
 
 pub fn register_players(
     user_ids: &HashSet<u64>,
@@ -24,7 +33,13 @@ pub fn register_players(
     Ok(())
 }
 
-pub async fn create_countdown(ctx: &Context, msg_content: &Message, mut countdown: i64) {
+pub async fn create_countdown(
+    ctx: &Context,
+    msg_content: &Message,
+    mut countdown: i64,
+    tx: tokio::sync::mpsc::Sender<bool>,
+    flag: Arc<AtomicBool>,
+) {
     let ctx_clone = ctx.clone();
     let message_clone = msg_content.clone();
 
@@ -36,6 +51,9 @@ pub async fn create_countdown(ctx: &Context, msg_content: &Message, mut countdow
         .await
     {
         println!("Erreur lors de l'ajout de la réaction : {:?}", why);
+    }
+    if flag.load(Ordering::SeqCst) {
+        return; // Sortez de la fonction si le drapeau est vrai
     }
 
     tokio::spawn(async move {
@@ -61,10 +79,12 @@ pub async fn create_countdown(ctx: &Context, msg_content: &Message, mut countdow
             for &emoji_str in emoji_to_add.iter() {
                 let emoji = ReactionType::Unicode(emoji_str.to_string());
 
-                if let Err(why) = message_clone.delete_reaction_emoji(&ctx_clone, emoji).await {
-                    println!("Erreur lors de la suppression des réactions : {:?}", why);
-                }
+                let _ = message_clone.delete_reaction_emoji(&ctx_clone, emoji).await;
             }
+        }
+        if !flag.load(Ordering::SeqCst) {
+            flag.store(true, Ordering::SeqCst);
+            tx.send(true).await.expect("Failed to send signal");
         }
 
         if let Err(why) = message_clone.delete(&ctx_clone).await {
@@ -78,7 +98,9 @@ pub async fn ask_question(
     ctx: &Context,
     channel_id: &ChannelId,
     countdown: i64,
+    tx: tokio::sync::mpsc::Sender<bool>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let flag = Arc::new(AtomicBool::new(false));
     loop {
         let random_id = rand::thread_rng().gen_range(1..=1010);
 
@@ -97,8 +119,29 @@ pub async fn ask_question(
                 .await;
 
             if let Ok(message) = embed_result {
-                create_countdown(&ctx, &message, countdown).await;
-                add_score(name, &ctx, &message, &channel_id).await;
+                let tx_for_countdown = tx.clone();
+                let tx_for_add_score = tx.clone();
+                let flag_for_countdown = flag.clone();
+                let flag_for_add_score = flag.clone();
+                create_countdown(
+                    &ctx,
+                    &message,
+                    countdown,
+                    tx_for_countdown,
+                    flag_for_countdown,
+                )
+                .await;
+
+                add_score(
+                    name,
+                    &ctx,
+                    &message,
+                    &channel_id,
+                    tx_for_add_score,
+                    flag_for_add_score,
+                )
+                .await
+                .expect("revoie la fonction add_score");
             } else if let Err(why) = embed_result {
                 println!("Error sending message: {:?}", why);
             }
@@ -114,48 +157,48 @@ pub async fn ask_question(
 pub async fn add_score(
     answer: String,
     ctx: &Context,
-    msg_content: &Message,
+    message: &Message,
     channel_id: &ChannelId,
-) {
+    tx: tokio::sync::mpsc::Sender<bool>,
+    flag: Arc<AtomicBool>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let redis_manager = RedisConManager::new().expect("Failed to initialize RedisConManager");
 
-    let answer_clone = answer.clone();
     let ctx_clone = ctx.clone();
-    let msg_content_clone = msg_content.clone();
+    let message_clone = message.clone();
     let channel_id_clone = channel_id.clone();
+    if flag.load(Ordering::SeqCst) {
+        return Ok(()); // Sortez de la fonction si le drapeau est vrai
+    }
 
     tokio::spawn(async move {
-        loop {
-            println!("Waiting for reply...");
-            if let Some(right_answer) = &msg_content_clone
-                .author
-                .await_reply(&ctx_clone)
-                .timeout(Duration::from_secs(16))
-                .await
-            {
-                println!("Received reply");
-                println!("{} 2", answer_clone);
-
-                if right_answer.content.to_lowercase() == answer_clone {
-                    redis_manager
-                        .increment_score(right_answer.author.id.0.to_string(), 1)
-                        .expect("not scored");
-
-                    msg_content_clone
-                        .delete(&ctx_clone)
-                        .await
-                        .expect("Failed to delete message");
-                    break;
-                }
-            }
-        }
-        let response = MessageBuilder::new()
-            .push_bold_safe(&msg_content_clone.author.name)
-            .push(", on a compris que t'as trouvé c bon 🤓")
+        let mut collector = MessageCollectorBuilder::new(&ctx_clone)
+            .channel_id(message_clone.channel_id)
             .build();
 
-        if let Err(why) = channel_id_clone.say(&ctx_clone.http, &response).await {
-            println!("Error sending message: {:?}", why);
+        while let Some(received_message) = collector.next().await {
+            if received_message.content.to_lowercase() == answer.to_lowercase() {
+                redis_manager
+                    .increment_score(received_message.author.id.0.to_string(), 1)
+                    .expect("not scored");
+                let response = MessageBuilder::new()
+                    .mention(&received_message.author.id)
+                    .push_bold(", Bonne réponse 🤓")
+                    .build();
+
+                if let Err(why) = channel_id_clone.say(&ctx_clone.http, &response).await {
+                    println!("Error sending message: {:?}", why);
+                }
+                message_clone
+                    .delete(&ctx_clone.http)
+                    .await
+                    .expect("Failed to delete message");
+                flag.store(true, Ordering::SeqCst);
+                tx.send(true).await.expect("Failed to send signal");
+                break;
+            }
         }
     });
+
+    Ok(())
 }

@@ -4,6 +4,6 @@ CREATE TABLE IF NOT EXISTS insultes (
 );
 
 CREATE TABLE IF NOT EXISTS winners (
-    id SERIAL PRIMARY KEY,  
-    winner TEXT NOT NULL 
+    did BIGINT PRIMARY KEY,  
+    win INT DEFAULT 0
 );

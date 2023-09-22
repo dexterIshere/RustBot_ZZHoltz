@@ -5,10 +5,13 @@ mod models;
 
 // use std::path::PathBuf;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
 use anyhow::anyhow;
 // use commands::admin::format_list::format_list;
 use commands::trash_cmds::admin::return_trash_list::list;
-use db::connections::redis_db::RedisConManager;
+use db::redis_db::RedisConManager;
 use serenity::async_trait;
 use serenity::model::application::interaction::{Interaction, InteractionResponseType};
 use serenity::model::gateway::Ready;
@@ -17,6 +20,8 @@ use serenity::model::prelude::Message;
 use serenity::prelude::*;
 use shuttle_secrets::SecretStore;
 use sqlx::{Executor, PgPool};
+
+use crate::commands::states::QuizState;
 
 struct Handler {
     guild_id: String,
@@ -64,13 +69,27 @@ impl EventHandler for Handler {
                 _ => "not possible to launch now :(".to_string(),
             };
             if command.data.name == "quiz" {
-                commands::quiz_cmds::launch_quiz::quizz_run(
-                    &command.data.options,
-                    &command,
-                    ctx.clone(),
-                    &self.redis_manager,
-                )
-                .await;
+                let data = ctx.data.read().await;
+                let quiz_state = data
+                    .get::<QuizState>()
+                    .expect("Expected QuizState in TypeMap");
+
+                match quiz_state.compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
+                {
+                    Ok(_) => {
+                        commands::quiz_cmds::launch_quiz::quizz_run(
+                            &command.data.options,
+                            &command,
+                            ctx.clone(),
+                            &self.redis_manager,
+                            &self.database,
+                        )
+                        .await;
+                    }
+                    Err(_) => {
+                        println!("Quiz déjà en cours");
+                    }
+                }
             }
 
             if let Err(why) = command
@@ -88,6 +107,9 @@ impl EventHandler for Handler {
 
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
+
+        let mut quiz_data = ctx.data.write().await;
+        quiz_data.insert::<QuizState>(Arc::new(AtomicBool::new(false)));
 
         let guild_id = GuildId(self.guild_id.parse().unwrap());
 

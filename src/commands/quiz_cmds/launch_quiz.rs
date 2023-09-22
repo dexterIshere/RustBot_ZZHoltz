@@ -11,9 +11,10 @@ use serenity::{
     },
     prelude::Context,
 };
+use sqlx::PgPool;
 
 // Internal Modules
-use crate::{db::connections::redis_db::RedisConManager, models::quiz_structs::QuizBuilder};
+use crate::{db::redis_db::RedisConManager, models::quiz_structs::QuizBuilder};
 
 // Super Modules
 
@@ -22,6 +23,7 @@ pub async fn quizz_run(
     command: &ApplicationCommandInteraction,
     ctx: Context,
     redis_manager: &RedisConManager,
+    pool: &PgPool,
 ) {
     let quiz_theme = options
         .get(0)
@@ -44,7 +46,7 @@ pub async fn quizz_run(
 
     let mut theme = String::new();
     let mut timer: i64 = 0;
-    let mut _score: i64 = 0;
+    let mut score: i64 = 0;
 
     if let CommandDataOptionValue::String(msg) = quiz_theme {
         theme = msg.clone();
@@ -53,11 +55,22 @@ pub async fn quizz_run(
         timer = *msg;
     }
     if let CommandDataOptionValue::Integer(msg) = quiz_score {
-        _score = *msg;
+        score = *msg;
     }
 
-    let mut quiz_builder =
-        QuizBuilder::build_quiz(redis_manager, ctx, command.channel_id, timer, theme);
+    let mut quiz_builder = QuizBuilder::build_quiz(
+        redis_manager,
+        ctx,
+        command.channel_id,
+        timer,
+        theme,
+        score,
+        pool,
+    );
+    launch_quiz(&mut quiz_builder).await;
+}
+
+pub async fn launch_quiz(quiz_builder: &mut QuizBuilder<'_>) {
     quiz_builder.lesgo().await;
 }
 
@@ -90,6 +103,6 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
                 .kind(CommandOptionType::Integer)
                 .required(true)
                 .min_int_value(1)
-                .max_int_value(50)
+                .max_int_value(20)
         })
 }
